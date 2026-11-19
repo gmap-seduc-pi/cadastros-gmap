@@ -1,0 +1,63 @@
+﻿INTEGRAÇÃO COM OS OUTROS SISTEMAS
+=================================
+
+
+COMO CADA SISTEMA LÊ A BASE HOJE
+--------------------------------
+
+Levantamento feito no código dos repositórios em novembro de 2026:
+
+Sistema                         Como lê                                                       Colunas usadas                                                Depende de
+------------------------------  ------------------------------------------------------------  ------------------------------------------------------------  ------------------------------------------------------------
+Painel de O.S. de Climatização  apps-script/Entidades.gs abre a planilha pelo ID e importa a aba ENTIDADES para o Supabase do painel todo dia às 5h, procurando as colunas pelo nome  ID SISTEMA, INEP, NOME ENTIDADE, MUNICIPIO, GRE/CIDADE, TIPOLOGIA, ZONA, ENDEREÇOS  Nome da aba e nome dessas colunas. Também gera códigos ID SISTEMA para linhas sem código
+Kanban GMAP                     Lê a aba publicada na web como CSV (Arquivo > Compartilhar > Publicar na Web). Nos templates, as colunas de chave e de rótulo são escolhidas pelo nome  As escolhidas em cada template                                Link publicado e nome das colunas escolhidas
+
+Consequências:
+- acrescentar colunas no fim não quebra nenhum dos dois;
+- renomear ou apagar as colunas acima, ou renomear a aba, quebra;
+- a aba publicada é pública (abre sem login): nunca coloque dados pessoais nela.
+
+
+FASE 1 (VERSÃO 1.0): ESPELHO, SEM MUDAR OS SISTEMAS
+---------------------------------------------------
+
+Depois da carga inicial, o Apps Script da planilha reescreve ENTIDADES e MATERIAIS a partir do banco todo dia às 4h, com os mesmos cabeçalhos. O Painel de O.S. continua importando às 5h e o Kanban continua lendo o CSV. Nenhum dos dois precisa de alteração.
+
+Como todas as linhas do espelho já têm ID SISTEMA, o Painel deixa de gerar códigos na planilha. Quem gera códigos novos passa a ser o banco dos Cadastros.
+
+
+FASE 2: CADA SISTEMA LÊ DIRETO DO BANCO
+---------------------------------------
+
+Recomendado assim que a fase 1 estiver estável. Elimina a planilha como intermediária e o atraso de até um dia.
+
+
+Painel de O.S.
+--------------
+1. Trocar a leitura da planilha em Entidades.gs por uma chamada à visão v_entidades dos Cadastros (chave secreta dos Cadastros nas propriedades do script do painel). Os campos têm nomes estáveis: id, inep, nome, municipio, gre_rotulo, tipologia, eh_escola, zona, endereco, ativo.
+2. Usar eh_escola em vez da lista fixa de tipologias de escola do painel.
+3. Migrar a tabela entidade_contatos do painel (responsável e contato por escola) para servidores e entidade_responsaveis dos Cadastros, quando o módulo de servidores for autorizado. Até lá, os contatos continuam no painel.
+
+
+Kanban GMAP
+-----------
+O Kanban aceita qualquer link CSV. Opções:
+- manter o CSV publicado da planilha espelho (mais simples, já funciona);
+- ou criar uma Edge Function nos Cadastros que devolva espelho_entidades em CSV, e trocar o link no template.
+
+
+Sistema patrimonial (futuro)
+----------------------------
+Deve usar os Cadastros como fonte de entidades, ambientes (localização dos bens), materiais (catálogo e tombos por unidade), fornecedores e contratos (origem da aquisição) e servidores (responsáveis e termos de responsabilidade). Como os dois bancos serão PostgreSQL, a integração pode ser:
+- mesmo banco, esquemas separados, quando o patrimonial for para o datacenter estadual (os Cadastros migram junto: as migrações usam SQL padrão e podem ser aplicadas em qualquer PostgreSQL 15 ou mais novo, trocando a parte de autenticação do Supabase);
+- ou leitura pelas visões v_* enquanto estiverem em servidores diferentes.
+
+
+CONTRATO DE DADOS
+-----------------
+
+O que os sistemas consumidores podem esperar sem quebrar:
+
+1. Códigos (E00001, A000001, MOB-0001...) nunca mudam nem são reaproveitados.
+2. Registros não somem: são inativados (ativo = false). Quem consome deve filtrar ou tratar inativos.
+3. Os nomes das colunas das visões v_entidades, v_ambientes, v_materiais, contratos_situacao, espelho_entidades e espelho_materiais só mudam em versão MAIOR, anunciada no CHANGELOG.txt. Colunas novas podem aparecer em versão MENOR.

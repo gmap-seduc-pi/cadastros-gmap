@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<!-- Ao publicar nova versão, troque o número em ?v=... abaixo para os navegadores baixarem os arquivos novos. -->
+<title>Cadastros GMAP · SEDUC-PI</title>
+<link rel="icon" href="assets/logo-seduc.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=1.0.0">
+</head>
+<body>
+
+<!-- Telas de acesso -->
+<div id="telaLogin" class="acesso" hidden>
+  <form class="acard" id="fLogin" novalidate>
+    <img src="assets/logo-seduc.png" alt="Secretaria da Educação (SEDUC) · Governo do Piauí">
+    <h1>Cadastros GMAP</h1>
+    <div class="sub">Base única de cadastros da Gerência de Material e Patrimônio</div>
+    <label>E-mail<input type="email" id="lEmail" required autocomplete="username"></label>
+    <label>Senha<input type="password" id="lSenha" required autocomplete="current-password"></label>
+    <div class="aerr" id="lErr"></div>
+    <button class="btn pri" type="submit">Entrar</button>
+    <div class="ahelp"><a href="#" id="aCad">Solicitar acesso</a> · <a href="#" id="aEsq">Esqueci a senha</a></div>
+  </form>
+</div>
+
+<div id="telaCad" class="acesso" hidden>
+  <form class="acard" id="fCad" novalidate>
+    <img src="assets/logo-seduc.png" alt="Secretaria da Educação (SEDUC) · Governo do Piauí">
+    <h1>Solicitar acesso</h1>
+    <div class="sub">O acesso só é liberado depois da aprovação de um gestor dos cadastros.</div>
+    <label>Nome completo<input type="text" id="cNome" required maxlength="120" autocomplete="name"></label>
+    <label>E-mail<input type="email" id="cEmail" required autocomplete="username"></label>
+    <label>Senha (mínimo de 10 caracteres)<input type="password" id="cS1" minlength="10" required autocomplete="new-password"></label>
+    <label>Repita a senha<input type="password" id="cS2" minlength="10" required autocomplete="new-password"></label>
+    <div class="aerr" id="cErr"></div>
+    <button class="btn pri" type="submit">Enviar solicitação</button>
+    <div class="ahelp"><a href="#" class="aVoltar">Voltar ao login</a></div>
+  </form>
+</div>
+
+<div id="telaEsq" class="acesso" hidden>
+  <form class="acard" id="fEsq" novalidate>
+    <img src="assets/logo-seduc.png" alt="Secretaria da Educação (SEDUC) · Governo do Piauí">
+    <h1>Esqueci a senha</h1>
+    <div class="sub">Enviaremos um link para você criar uma senha nova.</div>
+    <label>E-mail<input type="email" id="eEmail" required autocomplete="username"></label>
+    <div class="aerr" id="eErr"></div>
+    <button class="btn pri" type="submit">Enviar link</button>
+    <div class="ahelp"><a href="#" class="aVoltar">Voltar ao login</a></div>
+  </form>
+</div>
+
+<div id="telaNova" class="acesso" hidden>
+  <form class="acard" id="fNova" novalidate>
+    <img src="assets/logo-seduc.png" alt="Secretaria da Educação (SEDUC) · Governo do Piauí">
+    <h1>Nova senha</h1>
+    <label>Nova senha (mínimo de 10 caracteres)<input type="password" id="nS1" minlength="10" required autocomplete="new-password"></label>
+    <label>Repita a senha<input type="password" id="nS2" minlength="10" required autocomplete="new-password"></label>
+    <div class="aerr" id="nErr"></div>
+    <button class="btn pri" type="submit">Salvar senha</button>
+  </form>
+</div>
+
+<div id="telaPend" class="acesso" hidden>
+  <div class="acard">
+    <img src="assets/logo-seduc.png" alt="Secretaria da Educação (SEDUC) · Governo do Piauí">
+    <h1 id="pTit">Acesso em análise</h1>
+    <div class="sub" id="pMsg"></div>
+    <button class="btn" type="button" id="pSair">Sair</button>
+  </div>
+</div>
+
+<!-- Aplicação -->
+<div id="app" hidden>
+  <header class="topo">
+    <button class="btn ico menu" id="bMenu" type="button" aria-label="Abrir menu">☰</button>
+    <img src="assets/logo-seduc.png" alt="SEDUC · Governo do Piauí">
+    <div class="div"></div>
+    <div><h1>Cadastros GMAP</h1><div class="sub">Gerência de Material e Patrimônio</div></div>
+    <div class="sp"></div>
+    <div class="quem"><b id="uNome"></b><span id="uPerfil"></span></div>
+    <button class="btn" type="button" id="bSair">Sair</button>
+  </header>
+  <div class="corpo">
+    <nav class="lateral" id="nav"></nav>
+    <main class="conteudo" id="tela"></main>
+  </div>
+</div>
+
+<div class="gaveta" id="gaveta"><aside class="painel" id="detalhe" role="dialog" aria-modal="true"></aside></div>
+<div class="dlg" id="dlg"><div class="dlgp" id="dlgp" role="dialog" aria-modal="true"></div></div>
+<div class="avisos" id="avisos" aria-live="polite"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js?v=1.0.0"></script>
+<script src="ui.js?v=1.0.0"></script>
+<script src="cadastros.js?v=1.0.0"></script>
+<script src="telas.js?v=1.0.0"></script>
+<script src="app.js?v=1.0.0"></script>
+</body>
+</html>

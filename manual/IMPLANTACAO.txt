@@ -1,0 +1,116 @@
+﻿IMPLANTAÇÃO
+===========
+
+Passo a passo para colocar os Cadastros GMAP no ar. Tempo estimado: 1 hora, mais o tempo de conferência da carga inicial.
+
+
+1. CRIAR A ORGANIZAÇÃO E O PROJETO NO SUPABASE
+----------------------------------------------
+
+1. Entre em supabase.com (https://supabase.com) com a conta do setor.
+2. Clique em New organization, nome GMAP SEDUC-PI Cadastros, plano Free.
+3. Dentro dela, New project: nome cadastros-gmap, região South America (São Paulo), senha forte do banco (guarde no cofre de senhas do setor, não em arquivo).
+4. Em Authentication > Sign In / Providers > Email:
+   - deixe Allow new users to sign up ligado (o cadastro fica pendente até um gestor aprovar);
+   - recomendado: Confirm email ligado.
+5. Em Authentication > URL Configuration, preencha Site URL com o endereço do GitHub Pages (passo 3), por exemplo https://gmap-seduc-pi.github.io/cadastros-gmap/. Sem isso os links de confirmação e de nova senha não funcionam.
+
+Atenção ao plano gratuito: projetos sem acesso por 7 dias são pausados. O uso diário (Apps Script às 4h) já evita a pausa, mas confira se o gatilho do passo 5 está instalado.
+
+
+2. CRIAR O BANCO
+----------------
+
+No projeto, abra SQL Editor e execute, um arquivo por vez e em ordem, o conteúdo de:
+
+Ordem  Arquivo                                                   O que cria
+-----  --------------------------------------------------------  ------------------------------------------------------------
+1      supabase/migrations/001_acesso_e_auditoria.sql            Perfis com aprovação, auditoria, configuração, validação de CNPJ
+2      supabase/migrations/002_listas.sql                        GREs, municípios, tipologias, territórios, zonas, tipos de ambiente, funções, classes de material
+3      supabase/migrations/003_entidades_e_ambientes.sql         Entidades, dados escolares, matrículas por ano, ambientes
+4      supabase/migrations/004_materiais.sql                     Catálogo de materiais com código automático
+5      supabase/migrations/005_fornecedores_e_contratos.sql      Fornecedores, contratos, aditivos e situação dos contratos
+6      supabase/migrations/006_servidores.sql                    Servidores, responsáveis e fiscais (módulo travado)
+7      supabase/migrations/007_leitura_importacao_qualidade.sql  Visões de leitura, espelho, carga inicial e pendências
+
+Avisos ("NOTICE ... does not exist, skipping") são normais. Erro vermelho não: pare e verifique.
+
+
+3. PUBLICAR A INTERFACE
+-----------------------
+
+1. Crie o repositório cadastros-gmap na organização gmap-seduc-pi do GitHub e envie este código.
+2. Em Project Settings > API Keys do Supabase, copie a URL do projeto e a chave publishable (ou anon).
+3. Edite docs/config.js com esses dois valores. Nunca use a chave secreta aqui.
+4. No GitHub: Settings > Pages > Source: Deploy from a branch, branch main, pasta /docs.
+5. Acesse o endereço publicado e confira se a tela de login aparece.
+
+
+4. LIBERAR O PRIMEIRO GESTOR
+----------------------------
+
+1. No site, clique em Solicitar acesso e cadastre-se com o seu e-mail.
+2. Confirme o e-mail, se pedido.
+3. No SQL Editor, abra supabase/scripts/primeiro_gestor.sql, troque o e-mail e execute.
+4. Entre no site. A partir daí, aprove o Thyago e os técnicos pela tela Usuários.
+
+
+5. CARGA INICIAL DA PLANILHA BASE - CADASTROS
+---------------------------------------------
+
+Antes de começar: confira se todas as linhas da aba ENTIDADES têm o ID SISTEMA preenchido (o Painel de O.S. gera esses códigos todo dia às 5h). Linhas sem código recebem um código novo no banco.
+
+1. Abra a planilha BASE - CADASTROS > Extensões > Apps Script.
+2. Crie o arquivo Cadastros.gs e cole o conteúdo de apps-script/Cadastros.gs.
+3. Em Configurações do projeto > Propriedades do script, crie:
+   - SUPABASE_URL: a URL do projeto;
+   - SUPABASE_SECRET_KEY: a chave secreta (Project Settings > API Keys > Secret keys). Ela fica só aqui.
+4. Recarregue a planilha. Aparece o menu Cadastros GMAP.
+5. Clique em 1. Enviar planilha ao banco (carga inicial) e autorize o script.
+6. Leia o resumo e a aba PENDÊNCIAS DA CARGA (INEP inválido ou repetido, CNPJ inválido, linhas sem tipologia...). Corrija na planilha e envie de novo quantas vezes precisar.
+7. No sistema, abra Listas > Tipologias e desmarque "É escola" nas tipologias que não são escola (GRE, sede, etc.). Isso define quais entidades recebem matrículas e dados escolares.
+8. Confira os dados na tela Entidades e o quadro de pendências na tela Início.
+
+
+6. VIRAR A CHAVE: O BANCO PASSA A SER A FONTE
+---------------------------------------------
+
+Quando a conferência terminar:
+
+1. No sistema, Configurações > Concluir carga inicial. Não há volta: a planilha não pode mais ser enviada ao banco.
+2. Na planilha, menu Cadastros GMAP > 2. Atualizar espelho agora. Confira se as abas ENTIDADES e MATERIAIS continuam com os mesmos cabeçalhos.
+3. Menu 3. Instalar atualização diária do espelho (4h).
+4. Avise a equipe: a partir de agora, cadastros e correções são feitos só no sistema. A planilha mostra um aviso a quem tentar editar e é reescrita todo dia.
+5. Confira no dia seguinte se o Painel de O.S. importou normalmente às 5h e se o Kanban continua lendo os templates.
+
+
+7. MÓDULO DE SERVIDORES
+-----------------------
+
+Fica travado no banco até a autorização da gerência. Quando ela sair:
+
+1. Configurações > Ativar módulo, informando a referência da autorização (processo SEI, memorando ou e-mail).
+2. A referência fica gravada na auditoria. O módulo pode ser desativado depois; os dados continuam guardados, mas ninguém inclui nem altera.
+
+
+TESTES LOCAIS DO BANCO (PARA QUEM FOR ALTERAR AS MIGRAÇÕES)
+-----------------------------------------------------------
+
+Com um PostgreSQL 15 ou mais novo instalado:
+
+    PGHOST=localhost PGUSER=postgres ./supabase/testes/rodar_testes.sh
+
+O script cria o banco cadastros_teste, simula o mínimo do Supabase, aplica as migrações e testa as regras (perfis, permissões, auditoria, trava do módulo de servidores, carga inicial, espelho). Deve terminar com TODOS OS TESTES PASSARAM.
+
+
+PROBLEMAS COMUNS
+----------------
+
+Sintoma                                  Causa provável                             Solução
+---------------------------------------  -----------------------------------------  --------------------------
+Tela "Configuração pendente"             docs/config.js sem URL ou chave            Passo 3
+Usuário entra e vê "Acesso em análise"   Ainda não aprovado                         Gestor aprova em Usuários
+Link de confirmação abre página errada   Site URL não configurada                   Passo 1.5
+"Supabase respondeu 401" no Apps Script  Chave secreta errada ou ausente            Passo 5.3
+"A carga inicial já foi concluída"       Tentou enviar a planilha depois da virada  Faça a correção no sistema
+Espelho não grava                        Carga inicial ainda não concluída          Passo 6

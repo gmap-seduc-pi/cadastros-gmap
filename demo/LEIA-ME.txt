@@ -1,0 +1,14 @@
+DEMONSTRAÇÃO DOS CADASTROS GMAP
+===============================
+
+Abra o arquivo demonstracao.html com dois cliques (Chrome ou Edge). Não precisa de internet nem de login.
+
+- É a interface real do sistema, com um banco simulado dentro do navegador e dados fictícios.
+- Nada é gravado: recarregue a página (F5) para voltar ao estado inicial.
+- No canto inferior esquerdo, "Ver como" alterna entre Gestor dos cadastros e Técnico GMAP.
+
+Arquivos desta pasta (para quem mantém o sistema):
+- gerar_demo.py: monta o demonstracao.html a partir da pasta docs.
+- cliente_simulado.js: imita o Supabase no navegador, com as principais regras do banco.
+- dados_exemplo.json e semente_demo.sql: dados fictícios.
+- atualizar_dados.sh: recria os dados a partir do banco de teste local, quando o banco mudar.

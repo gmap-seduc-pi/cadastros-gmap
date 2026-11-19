@@ -1,0 +1,111 @@
+﻿MODELO DE DADOS
+===============
+
+
+VISÃO GERAL
+-----------
+
+    gres, municipios, tipologias, territorios, zonas          (listas controladas)
+            │
+            ▼
+    entidades (E00001) ──┬── dados_escola        (1 por escola)
+                         ├── matriculas_anuais   (1 por escola e ano)
+                         ├── ambientes (A000001) ◄── tipos_ambiente
+                         └── entidade_responsaveis (com período) ──► servidores (S00001)
+                                                                         ▲
+    fornecedores (F00001) ── contratos (C00001) ──┬── contrato_aditivos   │
+                                                  └── contrato_fiscais ───┘ (com período)
+    
+    classes_material (prefixo) ── materiais (MOB-0001)
+    
+    perfis, perfis_log, configuracao, auditoria                (controle do sistema)
+
+
+CÓDIGOS PERMANENTES
+-------------------
+
+Cadastro    Formato   Gerado por                     Observação
+----------  --------  -----------------------------  ------------------------------------------------------------
+Entidade    E00001    banco (sequência)              O mesmo "ID SISTEMA" da planilha. Chave usada pelo Painel de O.S.
+Ambiente    A000001   banco (sequência)              Será a localização dos bens no sistema patrimonial
+Material    MOB-0001  banco, pelo prefixo da classe  Mudar a classe depois não muda o código
+Fornecedor  F00001    banco (sequência)              O CNPJ também é único
+Contrato    C00001    banco (sequência)              O número do contrato (012/2025) também é único
+Servidor    S00001    banco (sequência)
+
+O banco recusa qualquer tentativa de alterar um código depois de criado. Números de sequência podem pular (uma inclusão recusada consome o número); isso é normal.
+
+
+TABELAS PRINCIPAIS
+------------------
+
+
+entidades
+---------
+Coluna                                        Tipo    Regra
+--------------------------------------------  ------  ------------------------------------------------------------
+id                                            texto   Código permanente
+inep                                          texto   8 dígitos, único, opcional
+nome                                          texto   Obrigatório
+tipologia_id                                  lista   Obrigatório. A tipologia diz se a entidade é escola (eh_escola)
+municipio_id, gre_id, territorio_id, zona_id  listas  Município é obrigatório na interface
+bairro, endereco, plus_code                   texto   Plus Code abre a localização no Google Maps
+cnpj                                          texto   Só os 14 dígitos, dígitos verificadores conferidos
+ativo, motivo_inativacao                              Inativar exige motivo
+
+
+dados_escola e matriculas_anuais
+--------------------------------
+Só aceitam entidades cuja tipologia é de escola. Matrículas têm uma linha por ano, com fonte (Censo Escolar, sistema de gestão escolar ou informada), preservando a série histórica.
+
+
+ambientes
+---------
+Tipo (lista), identificação ("Sala 01"), bloco, pavimento, capacidade. Não pode haver dois ambientes ativos com a mesma identificação e bloco na mesma entidade. A tela Início compara a quantidade de salas informada em dados_escola com as salas cadastradas aqui.
+
+
+materiais
+---------
+Classe (define o prefixo), tipo de controle (Singular, Composto, Kit, Quantitativo), tombos por unidade (vazio = variável, o "N" da planilha). Composto exige 2 ou mais tombos quando informado.
+
+
+fornecedores, contratos, contrato_aditivos
+------------------------------------------
+O contrato guarda vigência e valor originais. A visão contratos_situacao calcula vigência atual, valor atual, número de aditivos, situação (A iniciar, Vigente, Encerrado, Inativo) e dias para vencer.
+
+
+servidores, entidade_responsaveis, contrato_fiscais
+---------------------------------------------------
+Módulo travado até a autorização da gerência (configuracao.modulo_servidores_ativo). Guarda só nome, cargo e telefone. Responsáveis e fiscais têm início e fim: trocar o diretor encerra o vínculo anterior em vez de apagá-lo. Só pode haver um responsável vigente por função em cada entidade.
+
+
+auditoria
+---------
+Uma linha por inclusão ou alteração, gravada por gatilho no banco (a interface não consegue pular). Guarda tabela, código do registro, registro "pai" (a entidade de um ambiente, o contrato de um aditivo), campos alterados, valores antes e depois, autor e origem (interface, carga inicial, sistema).
+
+
+COMO ACRESCENTAR UM CAMPO NOVO
+------------------------------
+
+Exemplo: registrar a quantidade de turnos das escolas.
+
+1. Decida onde ele mora:
+   - vale para todas as entidades e muda pouco → coluna em entidades;
+   - só existe em escola → coluna em dados_escola;
+   - muda com o tempo e o histórico importa (matrículas, responsável, situação do prédio) → tabela nova com data ou ano.
+2. Crie a migração supabase/migrations/008_turnos_escola.sql:
+   sql
+   alter table public.dados_escola add column if not exists turnos int check (turnos between 1 and 4);
+   
+   Tabelas novas devem chamar select public.preparar_cadastro('nome_da_tabela', 'coluna_chave', 'coluna_pai'); para ganhar auditoria, regras de acesso e bloqueio de exclusão automaticamente.
+3. Rode os testes locais (supabase/testes/rodar_testes.sh) e aplique no SQL Editor.
+4. Mostre na interface: inclua o campo em docs/cadastros.js (em campos e, se quiser, em detalhe, colunas e exportar). Para dados_escola, o formulário fica em docs/telas.js, seção escola.
+5. Registre no CHANGELOG.txt.
+
+Não é preciso mexer na planilha espelho: ela só leva as colunas que o Painel de O.S. e o Kanban já usam. Um campo novo só vai para o espelho se um desses sistemas precisar dele (e nunca se for dado pessoal).
+
+
+LIBERAR UMA TABELA PARA OS TÉCNICOS
+-----------------------------------
+
+A função pode_editar() em 001_acesso_e_auditoria.sql diz o que cada perfil edita. Para liberar, por exemplo, matrículas aos técnicos, crie uma migração recriando a função com p_tabela in ('ambientes', 'matriculas_anuais').

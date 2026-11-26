@@ -2,6 +2,12 @@
 
 Formato: [MAIOR.MENOR.CORREÇÃO] · data · o que mudou. Migrações do banco citadas pelo número.
 
+## [1.0.1] · 2026-11-26
+
+### Correção
+- Migração 008: leitura das tabelas pela chave secreta. Projetos novos do Supabase não concedem mais essa permissão automaticamente, e o espelho da planilha falhava com "permission denied for table configuracao". Só leitura: a chave secreta continua sem gravar diretamente.
+- Testes do banco passam a simular projetos novos do Supabase (sem privilégios automáticos).
+
 ## [1.0.0] · 2026-11-19
 
 Primeira versão.

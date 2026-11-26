@@ -33,6 +33,7 @@ Ordem  Arquivo                                                   O que cria
 6      supabase/migrations/006_servidores.sql                    Servidores, responsáveis e fiscais (módulo travado)
 7      supabase/migrations/007_leitura_importacao_qualidade.sql  Visões de leitura, espelho, carga inicial e pendências
 8      supabase/migrations/008_leitura_pela_chave_secreta.sql    Leitura das tabelas pela chave secreta (usada pelo Apps Script)
+9      supabase/migrations/009_rotulo_gre_sede.sql          Rótulo "SEDE" da GRE igual ao da planilha
 
 Avisos ("NOTICE ... does not exist, skipping") são normais. Erro vermelho não: pare e verifique.
 

@@ -2,6 +2,12 @@
 
 Formato: [MAIOR.MENOR.CORREÇÃO] · data · o que mudou. Migrações do banco citadas pelo número.
 
+## [1.0.2] · 2026-11-26
+
+### Correção
+- Migração 009: rótulo da GRE igual ao da planilha quando código e nome coincidem ("SEDE" em vez de "SEDE - SEDE"). O rótulo antigo era recusado pela lista suspensa da coluna GRE/CIDADE e interrompia o espelho no meio da aba.
+- Apps Script 1.0.2: o espelho confere as listas suspensas da planilha antes de gravar (se algum valor seria recusado, não altera nada e lista os problemas) e, se a gravação falhar no meio, restaura o conteúdo anterior da aba. Também deixou de alterar a descrição de proteções já existentes na aba.
+
 ## [1.0.1] · 2026-11-26
 
 ### Correção

@@ -10,6 +10,8 @@
  *     cabeçalhos, para o Painel de O.S. e o Kanban continuarem funcionando sem mudança.
  *     O espelho NUNCA leva dados pessoais (a aba é publicada na web para o Kanban).
  *
+ * Versão 1.0.2: o espelho confere as listas suspensas antes de gravar e restaura a aba se algo falhar.
+ *
  * Propriedades do script (Configurações do projeto > Propriedades do script):
  *   SUPABASE_URL         https://xxxx.supabase.co
  *   SUPABASE_SECRET_KEY  chave secreta (sb_secret_... ou service_role). Nunca copie para o GitHub.
@@ -123,29 +125,76 @@ function atualizarEspelho() {
   }
 }
 
-/** Reescreve a aba com as linhas do banco, mantendo o cabeçalho e a ordem das colunas da planilha. */
+/**
+ * Reescreve a aba com as linhas do banco, mantendo o cabeçalho e a ordem das colunas da planilha.
+ * Segurança (v1.0.2):
+ *  1. confere ANTES de mexer na aba se algum valor seria recusado pelas listas suspensas
+ *     (validação de dados) da planilha; se houver, não altera nada e lista os problemas;
+ *  2. guarda uma cópia da aba e, se a gravação falhar no meio, devolve o conteúdo original.
+ */
 function escreverEspelho(nomeAba, linhas) {
   const aba = SpreadsheetApp.getActive().getSheetByName(nomeAba);
   if (!aba) throw new Error(`Aba ${nomeAba} não encontrada.`);
   if (!linhas.length) throw new Error(`O banco não devolveu ${nomeAba}. Espelho não alterado, por segurança.`);
   const chaves = Object.keys(linhas[0]);
   const ultimaCol = Math.max(aba.getLastColumn(), 1);
-  let cab = aba.getRange(1, 1, 1, ultimaCol).getValues()[0].map(String);
+  const cab = aba.getRange(1, 1, 1, ultimaCol).getValues()[0].map(String);
   // colunas do banco que não existem na planilha entram no fim
   chaves.forEach(k => { if (!cab.some(h => normalizar(h) === normalizar(k))) cab.push(k); });
   const mapa = cab.map(h => chaves.find(k => normalizar(k) === normalizar(h)) || null);
   const semOrigem = cab.filter((h, i) => h && !mapa[i]);
   if (semOrigem.length) console.warn(`${nomeAba}: colunas sem correspondência no banco ficarão vazias: ${semOrigem.join(', ')}`);
+  const dados = linhas.map(r => mapa.map(k => (k ? (r[k] === null ? '' : String(r[k])) : '')));
 
-  const dados = linhas.map(r => mapa.map(k => (k ? (r[k] === null ? '' : r[k]) : '')));
-  aba.getRange(1, 1, 1, cab.length).setValues([cab]);
-  const ultimaLinha = aba.getLastRow();
-  if (ultimaLinha > 1) aba.getRange(2, 1, ultimaLinha - 1, Math.max(cab.length, aba.getLastColumn())).clearContent();
-  aba.getRange(2, 1, dados.length, cab.length).setNumberFormat('@').setValues(dados);   // texto: preserva zeros à esquerda
+  // 1. Conferência prévia contra as listas suspensas da planilha
+  const recusados = conferirValidacoes_(aba, cab, dados);
+  if (recusados.length) {
+    throw new Error(`Espelho NÃO alterado: ${recusados.length} valor(es) seriam recusados pelas listas suspensas da aba ${nomeAba}. ` +
+      `Exemplos: ${recusados.slice(0, 5).join(' | ')}`);
+  }
 
-  const prot = aba.getProtections(SpreadsheetApp.ProtectionType.SHEET)[0] || aba.protect();
-  prot.setDescription('Espelho dos Cadastros GMAP: edite no sistema, não aqui (a planilha é reescrita todo dia).').setWarningOnly(true);
+  // 2. Cópia de segurança e gravação
+  const linhasAntes = Math.max(aba.getLastRow() - 1, 0), colsAntes = Math.max(aba.getLastColumn(), cab.length);
+  const copia = linhasAntes ? aba.getRange(2, 1, linhasAntes, colsAntes).getValues() : [];
+  try {
+    aba.getRange(1, 1, 1, cab.length).setValues([cab]);
+    if (linhasAntes) aba.getRange(2, 1, linhasAntes, colsAntes).clearContent();
+    aba.getRange(2, 1, dados.length, cab.length).setNumberFormat('@').setValues(dados);   // texto: preserva zeros à esquerda
+    SpreadsheetApp.flush();
+  } catch (e) {
+    if (linhasAntes) {
+      aba.getRange(2, 1, Math.max(dados.length, linhasAntes), colsAntes).clearContent();
+      aba.getRange(2, 1, linhasAntes, colsAntes).setValues(copia);
+      SpreadsheetApp.flush();
+    }
+    throw new Error(`Falha ao gravar a aba ${nomeAba}; o conteúdo anterior foi restaurado. Detalhe: ${e.message}`);
+  }
+
+  // Aviso a quem tentar editar à mão (só cria se a aba ainda não tiver proteção própria)
+  if (!aba.getProtections(SpreadsheetApp.ProtectionType.SHEET).length) {
+    aba.protect().setDescription('Espelho dos Cadastros GMAP: edite no sistema, não aqui (a planilha é reescrita todo dia).').setWarningOnly(true);
+  }
   return dados.length;
+}
+
+/** Lista os valores que as regras de validação (listas suspensas) da linha 2 recusariam. */
+function conferirValidacoes_(aba, cab, dados) {
+  const regras = aba.getRange(2, 1, 1, cab.length).getDataValidations()[0];
+  const recusados = [];
+  regras.forEach((regra, c) => {
+    if (!regra || regra.getAllowInvalid()) return;   // sem regra, ou regra que só avisa
+    const tipo = regra.getCriteriaType(), args = regra.getCriteriaValues();
+    let permitidos = null;
+    if (tipo === SpreadsheetApp.DataValidationCriteria.VALUE_IN_LIST) permitidos = args[0];
+    if (tipo === SpreadsheetApp.DataValidationCriteria.VALUE_IN_RANGE) permitidos = [].concat.apply([], args[0].getDisplayValues());
+    if (!permitidos) return;   // outros tipos de regra não são conferidos
+    const ok = new Set(permitidos.map(v => String(v).trim()));
+    dados.forEach((l, i) => {
+      const v = String(l[c]).trim();
+      if (v && !ok.has(v)) recusados.push(`linha ${i + 2}, ${cab[c]}: "${v}"`);
+    });
+  });
+  return recusados;
 }
 
 function instalarGatilhoEspelho() {
